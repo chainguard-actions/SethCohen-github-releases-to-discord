@@ -1,0 +1,31 @@
+name: Test missing webhook_url fails gracefully
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Inject release event payload into GITHUB_EVENT_PATH
+        run: |
+          echo "Current GITHUB_EVENT_PATH: $GITHUB_EVENT_PATH"
+          cat "$GITHUB_WORKSPACE/tests/fixtures/release-event.json" > "$GITHUB_EVENT_PATH"
+          echo "Injected release event payload"
+
+      - id: action
+        uses: .
+        with:
+          webhook_url: ""
+        continue-on-error: true
+
+      - name: Assert action failed due to missing webhook_url
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "action outcome: $OUTCOME"
+          if [ "$OUTCOME" != "failure" ]; then
+            echo "FAIL: expected action to fail when webhook_url is empty, but got: $OUTCOME"
+            exit 1
+          fi
+          echo "PASS: action correctly failed when webhook_url was not provided"

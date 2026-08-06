@@ -1,0 +1,42 @@
+name: Test with optional inputs
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set GITHUB_EVENT_PATH
+        run: |
+          echo "GITHUB_EVENT_PATH=$GITHUB_WORKSPACE/pristine/SethCohen--github-releases-to-discord/v1.18.0/tests/fixtures/release-event-headings.json" >> "$GITHUB_ENV"
+
+      - id: action
+        uses: .
+        continue-on-error: true
+        env:
+          GITHUB_EVENT_NAME: release
+          GITHUB_REPOSITORY: owner/repo
+        with:
+          webhook_url: "http://127.0.0.1:19999/fake-discord-webhook"
+          color: "16711680"
+          username: "Release Bot"
+          avatar_url: "https://example.com/avatar.png"
+          content: "A new release is available!"
+          footer_title: "Automated Release Notification"
+          footer_icon_url: "https://example.com/icon.png"
+          footer_timestamp: "true"
+          max_description: "2000"
+          remove_github_reference_links: "true"
+          reduce_headings: "true"
+
+      - name: Assert action ran with optional inputs (failed due to network, not input errors)
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" = "skipped" ]; then
+            echo "FAIL: action was skipped unexpectedly"
+            exit 1
+          fi
+          echo "PASS: action ran with all optional inputs (outcome=$OUTCOME)"

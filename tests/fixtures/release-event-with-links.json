@@ -1,0 +1,23 @@
+{
+  "action": "published",
+  "release": {
+    "id": 2,
+    "tag_name": "v2.0.0",
+    "name": "Release v2.0.0",
+    "body": "## Changes\n\n* Fixed bug https://github.com/owner/repo/pull/42\n* Resolved https://github.com/owner/repo/issues/10\n* Commit https://github.com/owner/repo/commit/abc123def456\n\n@contributor made this possible",
+    "html_url": "https://github.com/owner/repo/releases/tag/v2.0.0",
+    "draft": false,
+    "prerelease": false,
+    "created_at": "2024-01-02T00:00:00Z",
+    "published_at": "2024-01-02T00:00:00Z",
+    "author": {
+      "login": "testuser",
+      "id": 1
+    }
+  },
+  "repository": {
+    "id": 1,
+    "name": "repo",
+    "full_name": "owner/repo"
+  }
+}

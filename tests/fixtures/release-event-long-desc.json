@@ -1,0 +1,23 @@
+{
+  "action": "published",
+  "release": {
+    "id": 4,
+    "tag_name": "v4.0.0",
+    "name": "Release v4.0.0",
+    "body": "This is a very long release description that goes on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on.",
+    "html_url": "https://github.com/owner/repo/releases/tag/v4.0.0",
+    "draft": false,
+    "prerelease": false,
+    "created_at": "2024-01-04T00:00:00Z",
+    "published_at": "2024-01-04T00:00:00Z",
+    "author": {
+      "login": "testuser",
+      "id": 1
+    }
+  },
+  "repository": {
+    "id": 1,
+    "name": "repo",
+    "full_name": "owner/repo"
+  }
+}
