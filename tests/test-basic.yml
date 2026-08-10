@@ -1,0 +1,88 @@
+name: Test basic usage with release_name and release_body
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Start mock Discord webhook server
+        run: |
+          python3 -c "
+          import http.server, threading, json, sys
+
+          class Handler(http.server.BaseHTTPRequestHandler):
+              def do_POST(self):
+                  length = int(self.headers.get('Content-Length', 0))
+                  body = self.rfile.read(length)
+                  data = json.loads(body)
+                  # Write the received payload to a file for assertion
+                  with open('/tmp/webhook_payload.json', 'w') as f:
+                      json.dump(data, f)
+                  self.send_response(200)
+                  self.send_header('Content-Type', 'application/json')
+                  self.end_headers()
+                  # Discord returns the message object on success with wait=true
+                  self.wfile.write(json.dumps({'id': '123456789', 'type': 1}).encode())
+              def log_message(self, format, *args):
+                  pass
+
+          server = http.server.HTTPServer(('127.0.0.1', 9999), Handler)
+          t = threading.Thread(target=server.serve_forever)
+          t.daemon = True
+          t.start()
+          import time; time.sleep(60)
+          " &
+          sleep 1
+          echo "Mock server started"
+
+      - id: action
+        uses: .
+        with:
+          webhook_url: "http://127.0.0.1:9999/webhook"
+          release_name: "v1.0.0 - Initial Release"
+          release_body: "## What's New\n- Feature A\n- Feature B\n\nFull changelog: https://github.com/owner/repo/compare/v0.9.0...v1.0.0"
+          color: "3447003"
+
+      - name: Assert webhook payload was received
+        run: |
+          if [ ! -f /tmp/webhook_payload.json ]; then
+            echo "FAIL: webhook payload file not found — action did not POST to mock server"
+            exit 1
+          fi
+          echo "Payload received:"
+          cat /tmp/webhook_payload.json
+          echo "PASS: webhook payload received"
+
+      - name: Assert embed title matches release_name
+        run: |
+          TITLE=$(python3 -c "import json; d=json.load(open('/tmp/webhook_payload.json')); print(d['embeds'][0]['title'])")
+          echo "actual title: $TITLE"
+          if [ "$TITLE" != "v1.0.0 - Initial Release" ]; then
+            echo "FAIL: expected title 'v1.0.0 - Initial Release', got '$TITLE'"
+            exit 1
+          fi
+          echo "PASS"
+
+      - name: Assert embed color matches input
+        run: |
+          COLOR=$(python3 -c "import json; d=json.load(open('/tmp/webhook_payload.json')); print(d['embeds'][0]['color'])")
+          echo "actual color: $COLOR"
+          if [ "$COLOR" != "3447003" ]; then
+            echo "FAIL: expected color '3447003', got '$COLOR'"
+            exit 1
+          fi
+          echo "PASS"
+
+      - name: Assert description contains formatted changelog link
+        run: |
+          DESC=$(python3 -c "import json; d=json.load(open('/tmp/webhook_payload.json')); print(d['embeds'][0]['description'])")
+          echo "actual description: $DESC"
+          # The action converts compare URLs to markdown links
+          if echo "$DESC" | grep -q "v0.9.0...v1.0.0"; then
+            echo "PASS: description contains changelog reference"
+          else
+            echo "FAIL: description does not contain expected changelog reference"
+            exit 1
+          fi
