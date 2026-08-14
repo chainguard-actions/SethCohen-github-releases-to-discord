@@ -1,0 +1,104 @@
+name: Test remove_github_reference_links option
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Inject release event with GitHub links into GITHUB_EVENT_PATH
+        run: |
+          echo "Current GITHUB_EVENT_PATH: $GITHUB_EVENT_PATH"
+          cat "$GITHUB_WORKSPACE/tests/fixtures/release-event-links.json" > "$GITHUB_EVENT_PATH"
+          echo "Injected release event:"
+          cat "$GITHUB_EVENT_PATH"
+
+      - name: Set up mock Discord webhook server
+        run: |
+          mkdir -p /tmp/webhook-capture-links
+          python3 - <<'PYEOF' &
+          import http.server
+          import json
+
+          class Handler(http.server.BaseHTTPRequestHandler):
+              def log_message(self, format, *args):
+                  pass  # suppress default logging
+              def do_POST(self):
+                  length = int(self.headers.get('Content-Length', 0))
+                  body = self.rfile.read(length)
+                  with open('/tmp/webhook-capture-links/payload.json', 'wb') as f:
+                      f.write(body)
+                  self.send_response(200)
+                  self.send_header('Content-Type', 'application/json')
+                  self.end_headers()
+                  self.wfile.write(json.dumps({"id": "456789012", "type": 0}).encode())
+              def do_GET(self):
+                  self.send_response(200)
+                  self.send_header('Content-Type', 'application/json')
+                  self.end_headers()
+                  self.wfile.write(json.dumps({}).encode())
+
+          server = http.server.HTTPServer(('127.0.0.1', 9998), Handler)
+          with open('/tmp/webhook-server-links-ready', 'w') as f:
+              f.write('ready')
+          server.handle_request()  # handle one request then exit
+          PYEOF
+          # Wait for server to be ready
+          for i in $(seq 1 30); do
+            if [ -f /tmp/webhook-server-links-ready ]; then
+              echo "Mock webhook server ready on port 9998"
+              break
+            fi
+            sleep 0.5
+          done
+          if [ ! -f /tmp/webhook-server-links-ready ]; then
+            echo "ERROR: Mock webhook server did not start"
+            exit 1
+          fi
+
+      - name: Run action with remove_github_reference_links enabled
+        id: action
+        uses: .
+        with:
+          webhook_url: 'http://127.0.0.1:9998/api/webhooks/456/def'
+          remove_github_reference_links: 'true'
+
+      - name: Assert GitHub reference links were removed from description
+        run: |
+          if [ ! -f /tmp/webhook-capture-links/payload.json ]; then
+            echo "FAIL: No webhook payload was captured"
+            exit 1
+          fi
+
+          PAYLOAD=$(cat /tmp/webhook-capture-links/payload.json)
+          echo "Received payload:"
+          echo "$PAYLOAD"
+
+          # Extract description from the embed
+          DESCRIPTION=$(echo "$PAYLOAD" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['embeds'][0]['description'])")
+          echo "Description: $DESCRIPTION"
+
+          # Check that GitHub PR/issue/commit links are NOT in the description
+          if echo "$DESCRIPTION" | grep -q "github.com/owner/repo/issues/10"; then
+            echo "FAIL: issue link was NOT removed from description"
+            exit 1
+          fi
+
+          if echo "$DESCRIPTION" | grep -q "github.com/owner/repo/pull/20"; then
+            echo "FAIL: PR link was NOT removed from description"
+            exit 1
+          fi
+
+          if echo "$DESCRIPTION" | grep -q "github.com/owner/repo/commit/abc123"; then
+            echo "FAIL: commit link was NOT removed from description"
+            exit 1
+          fi
+
+          # Plain text should still be present
+          if ! echo "$DESCRIPTION" | grep -q "Some plain text here"; then
+            echo "FAIL: plain text content was unexpectedly removed"
+            exit 1
+          fi
+
+          echo "PASS: GitHub reference links were correctly removed from description"

@@ -1,0 +1,15 @@
+{
+  "action": "published",
+  "release": {
+    "id": 2,
+    "name": "v2.0.0 - Major Update",
+    "body": "## Changes\n\n* Fixed issue https://github.com/owner/repo/issues/10\n* Merged https://github.com/owner/repo/pull/20\n* Commit https://github.com/owner/repo/commit/abc123def456\n\nSome plain text here.",
+    "html_url": "https://github.com/owner/repo/releases/tag/v2.0.0",
+    "tag_name": "v2.0.0",
+    "draft": false,
+    "prerelease": false
+  },
+  "repository": {
+    "full_name": "owner/repo"
+  }
+}

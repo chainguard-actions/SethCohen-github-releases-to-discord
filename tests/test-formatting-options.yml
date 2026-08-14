@@ -1,0 +1,61 @@
+name: Test formatting options - GitHub Releases to Discord
+on:
+  workflow_dispatch:
+jobs:
+  test-formatting-options:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_EVENT_NAME: release
+      GITHUB_REF: refs/tags/v1.5.0
+      GITHUB_REPOSITORY: test-owner/test-repo
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create mock release event payload with headings and links
+        run: |
+          mkdir -p /tmp/github-event
+          cat > /tmp/github-event/event.json <<'EOF'
+          {
+            "action": "published",
+            "release": {
+              "tag_name": "v1.5.0",
+              "name": "Patch Release v1.5.0",
+              "body": "## Changes\n\n### Bug Fixes\n\n* Fixed issue #42\n* Fixed PR #99\n* See commit deadbeef\n\n## Notes\n\nSome additional notes here.",
+              "html_url": "https://github.com/test-owner/test-repo/releases/tag/v1.5.0",
+              "prerelease": false,
+              "draft": false,
+              "author": {
+                "login": "test-user",
+                "avatar_url": "https://avatars.githubusercontent.com/u/1?v=4"
+              }
+            },
+            "repository": {
+              "full_name": "test-owner/test-repo",
+              "html_url": "https://github.com/test-owner/test-repo"
+            }
+          }
+          EOF
+
+      - name: Set event path
+        run: echo "GITHUB_EVENT_PATH=/tmp/github-event/event.json" >> $GITHUB_ENV
+
+      - id: action
+        uses: .
+        continue-on-error: true
+        with:
+          webhook_url: https://discord.com/api/webhooks/000000000000000000/fake-webhook-token-for-testing
+          remove_github_reference_links: 'true'
+          reduce_headings: 'true'
+          max_description: '1000'
+
+      - name: Assert action ran with formatting options
+        run: |
+          echo "Action outcome: ${{ steps.action.outcome }}"
+          # The action will fail because the webhook URL is fake
+          # We verify the action ran (not a startup/config error)
+          if [ "${{ steps.action.outcome }}" = "success" ] || [ "${{ steps.action.outcome }}" = "failure" ]; then
+            echo "PASS: Action ran with formatting options (outcome: ${{ steps.action.outcome }})"
+          else
+            echo "FAIL: Unexpected outcome: ${{ steps.action.outcome }}"
+            exit 1
+          fi

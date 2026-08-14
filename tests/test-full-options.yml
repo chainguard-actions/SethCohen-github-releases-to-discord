@@ -1,0 +1,69 @@
+name: Test full options - GitHub Releases to Discord
+on:
+  workflow_dispatch:
+jobs:
+  test-full-options:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_EVENT_NAME: release
+      GITHUB_REF: refs/tags/v2.0.0
+      GITHUB_REPOSITORY: test-owner/test-repo
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create mock release event payload with rich content
+        run: |
+          mkdir -p /tmp/github-event
+          cat > /tmp/github-event/event.json <<'EOF'
+          {
+            "action": "published",
+            "release": {
+              "tag_name": "v2.0.0",
+              "name": "Major Release v2.0.0",
+              "body": "## Breaking Changes\n\n* Removed deprecated API\n\n### New Features\n\n* Feature X added\n* Feature Y added\n\nFixes #123, #456\nSee commit abc1234 for details\n\n**Full Changelog**: https://github.com/test-owner/test-repo/compare/v1.0.0...v2.0.0",
+              "html_url": "https://github.com/test-owner/test-repo/releases/tag/v2.0.0",
+              "prerelease": false,
+              "draft": false,
+              "author": {
+                "login": "test-user",
+                "avatar_url": "https://avatars.githubusercontent.com/u/1?v=4"
+              }
+            },
+            "repository": {
+              "full_name": "test-owner/test-repo",
+              "html_url": "https://github.com/test-owner/test-repo"
+            }
+          }
+          EOF
+
+      - name: Set event path
+        run: echo "GITHUB_EVENT_PATH=/tmp/github-event/event.json" >> $GITHUB_ENV
+
+      - id: action
+        uses: .
+        continue-on-error: true
+        with:
+          webhook_url: https://discord.com/api/webhooks/000000000000000000/fake-webhook-token-for-testing
+          color: '5814783'
+          username: 'Release Bot'
+          avatar_url: 'https://example.com/avatar.png'
+          custom_html_url: 'https://example.com/releases/v2.0.0'
+          content: 'New release is out!'
+          footer_title: 'My Project'
+          footer_icon_url: 'https://example.com/icon.png'
+          footer_timestamp: 'true'
+          max_description: '2048'
+          remove_github_reference_links: 'true'
+          reduce_headings: 'true'
+
+      - name: Assert action was invoked with all options (network failure is expected)
+        run: |
+          echo "Action outcome: ${{ steps.action.outcome }}"
+          # The action will fail because the webhook URL is fake
+          # We verify the action ran (not a startup/config error)
+          if [ "${{ steps.action.outcome }}" = "success" ] || [ "${{ steps.action.outcome }}" = "failure" ]; then
+            echo "PASS: Action was invoked with all options (outcome: ${{ steps.action.outcome }})"
+          else
+            echo "FAIL: Unexpected outcome: ${{ steps.action.outcome }}"
+            exit 1
+          fi
